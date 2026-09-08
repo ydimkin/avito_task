@@ -138,17 +138,8 @@ func (s *orderService) GetOrder(ctx context.Context, id uuid.UUID) (*domain.Orde
 }
 
 func (s *orderService) CancelOrder(ctx context.Context, id uuid.UUID, reason string) error {
-	order, err := s.orderRepo.GetOrderByID(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	if !domain.CanCustomerCancel(order.Status) {
-		return domain.ErrCannotCancelOrder
-	}
-
 	comment := fmt.Sprintf("Отмена клиентом. Причина: %s", reason)
-	return s.orderRepo.UpdateOrderStatus(ctx, id, domain.OrderStatusCancelled, &comment)
+	return s.orderRepo.CancelOrder(ctx, id, &comment)
 }
 
 func (s *orderService) UpdateStatus(ctx context.Context, id uuid.UUID, newStatus domain.OrderStatus, comment *string) error {

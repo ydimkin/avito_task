@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,5 +59,14 @@ func RegisterSwagger(r *gin.Engine) {
 	r.GET("/swagger/index.html", func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.String(http.StatusOK, swaggerUIHTML)
+	})
+	r.GET("/swagger/openapi.yml", func(c *gin.Context) {
+		for _, path := range []string{"/app/api/openapi.yml", "api/openapi.yml", "../api/openapi.yml"} {
+			if _, err := os.Stat(path); err == nil {
+				c.File(path)
+				return
+			}
+		}
+		c.Status(http.StatusNotFound)
 	})
 }

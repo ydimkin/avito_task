@@ -48,6 +48,7 @@ func (r *postgresOrderRepository) CreateOrder(ctx context.Context, order *domain
 			}
 			if newStock == 0 {
 				updates["is_available"] = false
+				updates["auto_unavailable"] = true
 			}
 
 			if err := tx.Model(&item).Updates(updates).Error; err != nil {
@@ -102,22 +103,21 @@ func (r *postgresOrderRepository) UpdateOrderStatus(
 	comment *string,
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1. Если заказ отменяется, возвращаем списанные остатки на склад
+		order, err := r.lockOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+		if !domain.IsValidTransition(order.Status, newStatus) {
+			return domain.ErrInvalidStatusTransition
+		}
+
 		if newStatus == domain.OrderStatusCancelled {
-			var order domain.Order
-			if err := tx.Preload("Items").First(&order, "id = ?", orderID).Error; err == nil {
-				for _, it := range order.Items {
-					_ = tx.Model(&domain.MenuItem{}).
-						Where("id = ?", it.MenuItemID).
-						Updates(map[string]interface{}{
-							"stock_quantity": gorm.Expr("stock_quantity + ?", it.Quantity),
-							"is_available":   true,
-						}).Error
-				}
+			if err := r.restoreOrderStock(tx, order); err != nil {
+				return err
 			}
 		}
 
-		// 2. Обновляем статус заказа
+		// Обновляем статус заказа после проверки состояния под блокировкой строки.
 		updates := map[string]interface{}{
 			"status":     newStatus,
 			"updated_at": time.Now(),
@@ -126,12 +126,8 @@ func (r *postgresOrderRepository) UpdateOrderStatus(
 			updates["cancel_reason"] = *comment
 		}
 
-		result := tx.Model(&domain.Order{}).Where("id = ?", orderID).Updates(updates)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return domain.ErrNotFound
+		if err := tx.Model(&order).Updates(updates).Error; err != nil {
+			return err
 		}
 
 		// 3. Фиксируем запись в истории статусов
@@ -148,6 +144,76 @@ func (r *postgresOrderRepository) UpdateOrderStatus(
 
 		return nil
 	})
+}
+
+// CancelOrder атомарно проверяет окно отмены и меняет статус заказа.
+// Проверка выполняется после SELECT FOR UPDATE, поэтому параллельный переход
+// кухни в COOKING не может быть обойден устаревшим чтением в сервисе.
+func (r *postgresOrderRepository) CancelOrder(
+	ctx context.Context,
+	orderID uuid.UUID,
+	comment *string,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		order, err := r.lockOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+		if !domain.CanCustomerCancel(order.Status) {
+			return domain.ErrCannotCancelOrder
+		}
+		if err := r.restoreOrderStock(tx, order); err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{
+			"status":     domain.OrderStatusCancelled,
+			"updated_at": time.Now(),
+		}
+		if comment != nil {
+			updates["cancel_reason"] = *comment
+		}
+		if err := tx.Model(&order).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		history := domain.OrderStatusHistory{
+			ID:        uuid.New(),
+			OrderID:   orderID,
+			Status:    domain.OrderStatusCancelled,
+			Comment:   comment,
+			CreatedAt: time.Now(),
+		}
+		return tx.Create(&history).Error
+	})
+}
+
+func (r *postgresOrderRepository) lockOrder(tx *gorm.DB, orderID uuid.UUID) (*domain.Order, error) {
+	var order domain.Order
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Preload("Items").First(&order, "id = ?", orderID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (r *postgresOrderRepository) restoreOrderStock(tx *gorm.DB, order *domain.Order) error {
+	for _, item := range order.Items {
+		if err := tx.Model(&domain.MenuItem{}).
+			Where("id = ?", item.MenuItemID).
+			Updates(map[string]interface{}{
+				"stock_quantity":   gorm.Expr("stock_quantity + ?", item.Quantity),
+				"is_available":     gorm.Expr("CASE WHEN auto_unavailable = true THEN true ELSE is_available END"),
+				"auto_unavailable": false,
+			}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *postgresOrderRepository) ListOrdersByRestaurant(

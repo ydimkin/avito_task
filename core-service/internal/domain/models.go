@@ -45,16 +45,17 @@ type MenuCategory struct {
 
 // MenuItem представляет позицию меню
 type MenuItem struct {
-	ID            uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	RestaurantID  uuid.UUID `json:"restaurant_id" gorm:"type:uuid;not null;index"`
-	CategoryID    uuid.UUID `json:"category_id" gorm:"type:uuid;not null;index"`
-	Name          string    `json:"name" gorm:"type:varchar(255);not null"`
-	Description   string    `json:"description" gorm:"type:text"`
-	Price         float64   `json:"price" gorm:"type:numeric(10,2);not null"`
-	StockQuantity int       `json:"stock_quantity" gorm:"not null;default:0"`
-	IsAvailable   bool      `json:"is_available" gorm:"default:true;index"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID              uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	RestaurantID    uuid.UUID `json:"restaurant_id" gorm:"type:uuid;not null;index"`
+	CategoryID      uuid.UUID `json:"category_id" gorm:"type:uuid;not null;index"`
+	Name            string    `json:"name" gorm:"type:varchar(255);not null"`
+	Description     string    `json:"description" gorm:"type:text"`
+	Price           float64   `json:"price" gorm:"type:numeric(10,2);not null"`
+	StockQuantity   int       `json:"stock_quantity" gorm:"not null;default:0"`
+	IsAvailable     bool      `json:"is_available" gorm:"default:true;index"`
+	AutoUnavailable bool      `json:"-" gorm:"not null;default:false"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Order представляет заказ клиента

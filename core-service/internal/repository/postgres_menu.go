@@ -65,7 +65,10 @@ func (r *postgresMenuRepository) SetItemAvailability(ctx context.Context, restau
 	result := r.db.WithContext(ctx).
 		Model(&domain.MenuItem{}).
 		Where("id = ? AND restaurant_id = ?", itemID, restaurantID).
-		Update("is_available", isAvailable)
+		Updates(map[string]interface{}{
+			"is_available":     isAvailable,
+			"auto_unavailable": false,
+		})
 
 	if result.Error != nil {
 		return result.Error
@@ -86,8 +89,9 @@ func (r *postgresMenuRepository) UpdateStock(ctx context.Context, restaurantID, 
 		Model(&domain.MenuItem{}).
 		Where("id = ? AND restaurant_id = ?", itemID, restaurantID).
 		Updates(map[string]interface{}{
-			"stock_quantity": stock,
-			"is_available":   isAvailable,
+			"stock_quantity":   stock,
+			"is_available":     isAvailable,
+			"auto_unavailable": false,
 		})
 
 	if result.Error != nil {

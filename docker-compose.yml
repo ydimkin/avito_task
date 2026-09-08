@@ -13,6 +13,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/01_init_schema.sql:ro
       - ./migrations/000002_seed_data.up.sql:/docker-entrypoint-initdb.d/02_seed_data.sql:ro
+      - ./migrations/000003_add_menu_item_availability_source.up.sql:/docker-entrypoint-initdb.d/03_add_menu_item_availability_source.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-avito_kitchen}"]
       interval: 3s

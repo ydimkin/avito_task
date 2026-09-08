@@ -42,6 +42,18 @@ func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID
 	return domain.ErrNotFound
 }
 
+func (m *mockOrderRepo) CancelOrder(ctx context.Context, orderID uuid.UUID, comment *string) error {
+	o, ok := m.orders[orderID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if !domain.CanCustomerCancel(o.Status) {
+		return domain.ErrCannotCancelOrder
+	}
+	o.Status = domain.OrderStatusCancelled
+	return nil
+}
+
 func (m *mockOrderRepo) ListOrdersByRestaurant(ctx context.Context, restaurantID uuid.UUID, status *domain.OrderStatus) ([]domain.Order, error) {
 	var list []domain.Order
 	for _, o := range m.orders {

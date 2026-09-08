@@ -29,5 +29,6 @@ type OrderRepository interface {
 	CreateOrder(ctx context.Context, order *domain.Order) error
 	GetOrderByID(ctx context.Context, id uuid.UUID) (*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, newStatus domain.OrderStatus, comment *string) error
+	CancelOrder(ctx context.Context, orderID uuid.UUID, comment *string) error
 	ListOrdersByRestaurant(ctx context.Context, restaurantID uuid.UUID, status *domain.OrderStatus) ([]domain.Order, error)
 }
