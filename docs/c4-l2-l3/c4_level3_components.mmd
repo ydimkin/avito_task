@@ -1,0 +1,52 @@
+flowchart TD
+    classDef handler fill:#2B6CB0,stroke:#1E4E8C,color:#FFFFFF,stroke-width:2px;
+    classDef service fill:#2C5282,stroke:#1A365D,color:#FFFFFF,stroke-width:2px;
+    classDef domain fill:#C05621,stroke:#9C4221,color:#FFFFFF,stroke-width:2px;
+    classDef repo fill:#2F855A,stroke:#22543D,color:#FFFFFF,stroke-width:2px;
+    classDef db fill:#1A365D,stroke:#0F172A,color:#FFFFFF,stroke-width:2px;
+    classDef ext fill:#4A5568,stroke:#2D3748,color:#FFFFFF,stroke-width:2px;
+
+    ClientReq["HTTP-запросы клиентов и партнеров"]
+
+    subgraph CoreService["Core Service (:8080)"]
+        
+        subgraph Transport["1. Транспортный слой (Gin)"]
+            ClientHandler["ClientHandler<br/>GET /restaurants, GET /menu<br/>POST /orders, POST /orders/cancel"]:::handler
+            PartnerHandler["PartnerHandler<br/>POST /partner/menu<br/>PATCH /availability, /stock, /status"]:::handler
+        end
+
+        subgraph Domain["2. Бизнес-логика (Services & FSM)"]
+            OrderService["OrderService<br/>Чекаут, снимки цен, валидация отмен"]:::service
+            MenuService["MenuService<br/>Каталог блюд, остатки, стоп-листы"]:::service
+            RestService["RestaurantService<br/>Проверка активности заведений"]:::service
+            OrderFSM["Order FSM<br/>Матрица переходов статусов"]:::domain
+            WebhookService["WebhookService<br/>Асинхронный HTTP-пуш в горутине"]:::service
+        end
+
+        subgraph DataAccess["3. Слой доступа к данным (GORM Repositories)"]
+            OrderRepo["OrderRepository<br/>SELECT FOR UPDATE, списание/возврат остатков,<br/>логирование order_status_history"]:::repo
+            MenuRepo["MenuRepository<br/>Выборка категорий и блюд по ID"]:::repo
+            RestRepo["RestaurantRepository<br/>Поиск ресторанов (ILIKE)"]:::repo
+        end
+    end
+
+    Database[("PostgreSQL 16 (:5432)<br/>Таблицы каталога, заказов и аудита")]:::db
+    PartnerService["Restaurant Service (:8081)<br/>POST /webhook/orders"]:::ext
+
+    ClientReq --> ClientHandler & PartnerHandler
+
+    ClientHandler --> OrderService & MenuService & RestService
+    PartnerHandler --> OrderService & MenuService
+
+    OrderService --> OrderFSM
+    OrderService --> OrderRepo & MenuRepo
+    OrderService -.->|"Фоновый вызов"| WebhookService
+
+    MenuService --> MenuRepo
+    RestService --> RestRepo
+
+    WebhookService -->|"HTTP POST"| PartnerService
+
+    OrderRepo -->|"ACID транзакции (SELECT FOR UPDATE)"| Database
+    MenuRepo --> Database
+    RestRepo --> Database

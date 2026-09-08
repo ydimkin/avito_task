@@ -1,0 +1,20 @@
+journey
+    title CJM: Путь заведения-партнера
+    section 1. Каталог и меню
+      Вход в партнерский интерфейс: 5: Партнер, POS
+      Выгрузка меню и цен (POST /menu): 5: Партнер, Core Service
+      Проверка позиций на витрине: 4: Партнер, Web
+    section 2. Оперативное управление
+      Закончился ингредиент на кухне: 2: Шеф-повар
+      Мгновенный ввод в стоп-лист (PATCH /availability): 5: Шеф-повар, Core Service
+      Пополнение остатков (PATCH /stock): 5: Партнер, Core Service
+    section 3. Прием заказа
+      Получение вебхука (POST /webhook/orders): 5: Core Service, POS
+      Подтверждение заказа (ACCEPTED): 5: Шеф-повар, Core Service
+    section 4. Приготовление
+      Старт приготовления на кухне (COOKING): 5: Шеф-повар, Core Service
+      Блокировка отмены клиентом: 5: Ресторан, Core Service
+      Упаковка готового блюда (READY_FOR_DELIVERY): 5: Повар, Core Service
+    section 5. Передача в доставку
+      Передача пакета курьеру (IN_DELIVERY): 5: Шеф-повар, Курьер
+      Отметка о доставке клиенту (DELIVERED): 5: Курьер, Core Service

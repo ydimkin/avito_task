@@ -1,0 +1,65 @@
+erDiagram
+    RESTAURANTS ||--o{ MENU_CATEGORIES : "has"
+    RESTAURANTS ||--o{ MENU_ITEMS : "has"
+    RESTAURANTS ||--o{ ORDERS : "receives"
+    MENU_CATEGORIES ||--o{ MENU_ITEMS : "groups"
+    ORDERS ||--o{ ORDER_ITEMS : "contains"
+    ORDERS ||--o{ ORDER_STATUS_HISTORY : "tracks"
+    MENU_ITEMS ||--o{ ORDER_ITEMS : "references"
+
+    RESTAURANTS {
+        uuid id PK
+        string name
+        text description
+        string address
+        string webhook_url
+        boolean is_active
+        timestamp created_at
+    }
+
+    MENU_CATEGORIES {
+        uuid id PK
+        uuid restaurant_id FK
+        string name
+        int sort_order
+    }
+
+    MENU_ITEMS {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid category_id FK
+        string name
+        numeric price
+        int stock_quantity
+        boolean is_available
+    }
+
+    ORDERS {
+        uuid id PK
+        uuid user_id
+        uuid restaurant_id FK
+        string customer_name
+        string customer_phone
+        string delivery_address
+        string status
+        numeric total_price
+        timestamp created_at
+    }
+
+    ORDER_ITEMS {
+        uuid id PK
+        uuid order_id FK
+        uuid menu_item_id FK
+        string name_at_moment
+        numeric price_at_moment
+        int quantity
+        numeric subtotal
+    }
+
+    ORDER_STATUS_HISTORY {
+        uuid id PK
+        uuid order_id FK
+        string status
+        text comment
+        timestamp created_at
+    }

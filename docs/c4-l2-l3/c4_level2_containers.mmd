@@ -1,0 +1,25 @@
+flowchart LR
+    classDef actor fill:#1A365D,stroke:#0F172A,color:#FFFFFF,stroke-width:2px;
+    classDef core fill:#2B6CB0,stroke:#1E4E8C,color:#FFFFFF,stroke-width:2px;
+    classDef db fill:#2C5282,stroke:#1A365D,color:#FFFFFF,stroke-width:2px;
+    classDef partner fill:#4A5568,stroke:#2D3748,color:#FFFFFF,stroke-width:2px;
+
+    Client["Клиент<br/>(Web / Mobile SPA)"]:::actor
+    PartnerStaff["Персонал заведения<br/>(Касса / POS)"]:::actor
+
+    subgraph Platform["Платформа Авито.Кухня"]
+        CoreService["Core Service (:8080)<br/>Go 1.24, Gin, GORM<br/>REST API, чекаут, FSM, вебхуки"]:::core
+        Database[("PostgreSQL 16 (:5432)<br/>Заведения, меню, заказы,<br/>снимки цен, аудит статусов")]:::db
+    end
+
+    subgraph PartnerEnv["Контур заведения-партнера"]
+        PartnerService["Restaurant Service (:8081)<br/>parent-service (Go, Gin)<br/>Эмулятор POS и кухни"]:::partner
+    end
+
+    Client -->|"Поиск, меню, чекаут, отмена<br/>[HTTP / JSON]"| CoreService
+    PartnerStaff -->|"Каталог, стоп-листы, остатки<br/>[HTTP / JSON]"| CoreService
+
+    CoreService -->|"ACID транзакции<br/>SELECT FOR UPDATE"| Database
+
+    CoreService -->|"Новый заказ<br/>[Webhook HTTP POST]"| PartnerService
+    PartnerService -->|"Смена статусов FSM<br/>[HTTP PATCH]"| CoreService

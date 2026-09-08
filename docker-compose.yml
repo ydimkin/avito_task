@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: avito-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-avito_kitchen}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/01_init_schema.sql:ro
+      - ./migrations/000002_seed_data.up.sql:/docker-entrypoint-initdb.d/02_seed_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-avito_kitchen}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  core-service:
+    build:
+      context: ./core-service
+      dockerfile: Dockerfile
+    container_name: avito-core-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: ${CORE_PORT:-8080}
+      DB_HOST: postgres
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-avito_kitchen}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      WEBHOOK_TIMEOUT_SEC: ${WEBHOOK_TIMEOUT_SEC:-5}
+      WEBHOOK_HOST_OVERRIDE: ${WEBHOOK_HOST_OVERRIDE:-parent-service:8081}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    ports:
+      - "${CORE_PORT:-8080}:8080"
+    volumes:
+      - ./api:/app/api:ro
+
+  parent-service:
+    build:
+      context: ./parent-service
+      dockerfile: Dockerfile
+    container_name: avito-parent-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core-service:
+        condition: service_started
+    environment:
+      PORT: ${RESTAURANT_PORT:-8081}
+      CORE_SERVICE_URL: http://core-service:8080
+      RESTAURANT_ID: ${RESTAURANT_ID:-a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: json
+    ports:
+      - "${RESTAURANT_PORT:-8081}:8081"
+    networks:
+      default:
+        aliases:
+          - restaurant-service
+
+volumes:
+  pgdata:

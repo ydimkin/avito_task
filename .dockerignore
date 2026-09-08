@@ -1,0 +1,13 @@
+.git
+.gitignore
+bin/
+.env
+.env.*
+*.env
+.DS_Store
+docs/
+*.md
+.golangci.yml
+Makefile
+scripts/
+
